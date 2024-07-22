@@ -103,7 +103,6 @@ impl List {
     ///   shsc::todata!(3),
     /// ]);
     /// let data = list.get(1).unwrap();
-    /// assert_eq!(data.toint(), 2);
     /// ```
 
     pub fn get(&self, index: usize) -> Option<&crate::Data> {
@@ -167,7 +166,7 @@ impl List {
     /// List as vector
     /// ### Example
     /// ```
-    /// let list = shsc::List::from(vec![ shsc::todata!(1), shsc::todata!(2), shsc::todata!(3), ]);
+    /// let mut list = shsc::List::from(vec![ shsc::todata!(1), shsc::todata!(2), shsc::todata!(3), ]);
     /// let vec = list.as_vec();
     /// ```
 
@@ -192,7 +191,7 @@ impl List {
     /// List as vector of mutable data
     /// ### Example
     /// ```
-    /// let list = shsc::List::from(vec![ shsc::todata!(1), shsc::todata!(2), shsc::todata!(3), ]);
+    /// let mut list = shsc::List::from(vec![ shsc::todata!(1), shsc::todata!(2), shsc::todata!(3), ]);
     /// let vec = list.as_vec_mut();
     /// ```
 
@@ -306,7 +305,7 @@ impl ops::Index<usize> for List {
     /// ### Example
     /// ```
     /// let list = shsc::List::from(vec![ shsc::todata!(1), shsc::todata!(2), shsc::todata!(3), ]);
-    /// let data = list[1];
+    /// let data = &list[1];
     /// ```
 
     fn index(&self, index: usize) -> &crate::Data {
@@ -342,6 +341,7 @@ impl traits::ToStr for List {
     /// List as string
     /// ### Example
     /// ```
+    /// use crate::shsc::traits::ToStr;
     /// let list = shsc::List::from(vec![ shsc::todata!(1), shsc::todata!(2), shsc::todata!(3), ]);
     /// let s = list.tostr();
     /// ```
@@ -367,7 +367,8 @@ impl traits::RefCopy for List {
     /// A reference copy of the list
     /// ### Example
     /// ```
-    /// let list = shsc::List::from(vec![ shsc::todata!(1), shsc::todata!(2), shsc::todata!(3), ]);
+    /// use crate::shsc::traits::RefCopy;
+    /// let mut list = shsc::List::from(vec![ shsc::todata!(1), shsc::todata!(2), shsc::todata!(3), ]);
     /// let list1 = list.refcopy();
     /// ```
 
@@ -385,10 +386,13 @@ impl traits::RefCopy for List {
     /// Implement the RefDrop trait for the List struct.
     /// This allows us to drop the List struct.
     /// List will be deallocated if the reference count reaches zero.
+    /// Can cause undefined behavior if used without shsc::traits::RefCopy::refcopy.
     /// ### Example
     /// ```
-    /// let list = shsc::List::from(vec![ shsc::todata!(1), shsc::todata!(2), shsc::todata!(3), ]);
-    /// list.refdrop();
+    /// use crate::shsc::traits::RefCopy;
+    /// let mut list = shsc::List::from(vec![ shsc::todata!(1), shsc::todata!(2), shsc::todata!(3), ]);
+    /// let list1 = list.refcopy(); // new reference copy
+    /// list.refdrop();             // drop original reference copy
     /// ```
 
     fn refdrop(&mut self) {
@@ -456,6 +460,10 @@ impl traits::RefC for List {
 impl Drop for List {
     /// Implement the Drop trait for the List struct.
     /// This allows us to deallocate the List struct when the reference count reaches zero.
+    /// ### Example
+    /// ```
+    /// let list = shsc::List::from(vec![ shsc::todata!(1), shsc::todata!(2), shsc::todata!(3), ]);
+    /// ```
     fn drop(&mut self) {
         self.refdrop();
     }

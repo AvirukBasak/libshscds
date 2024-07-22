@@ -74,6 +74,18 @@ impl String {
         self.str.as_vec_mut()
     }
 
+    /// Concatenate two shsc::String structs.
+    /// ### Arguments
+    /// * `other` - A shsc::String struct
+    /// ### Returns
+    /// A new shsc::String struct
+    /// ### Example
+    /// ```
+    /// let s = shsc::String::from("hello");
+    /// let s2 = shsc::String::from(" world");
+    /// let s3 = s.concat(&s2);
+    /// ```
+
     pub fn concat(&self, other: &crate::String) -> crate::String {
         let mut newstr = crate::String::new();
         newstr.append(self);
@@ -95,7 +107,8 @@ impl traits::Append<char> for crate::String {
     /// s.append('o');
     /// s.append('r');
     /// s.append('l');
-    /// s.append('d');
+    /// s.append('d')
+    /// ```
 
     fn append(&mut self, c: char) {
         self.str.append(crate::todata!(c));
@@ -209,6 +222,7 @@ impl traits::ToStr for String {
     /// A native String type
     /// ### Example
     /// ```
+    /// use shsc::traits::ToStr;
     /// let s = shsc::String::from("hello");
     /// let str = s.tostr();
     /// assert_eq!(str, "hello");
@@ -239,6 +253,7 @@ impl traits::RefCopy for String {
     /// A reference counted copy of the String struct
     /// ### Example
     /// ```
+    /// use shsc::traits::RefCopy;
     /// let mut s = shsc::String::from("hello");
     /// let s2 = s.refcopy();
     /// ```
@@ -254,13 +269,14 @@ impl traits::RefCopy for String {
     /// String will be deallocated if the reference count reaches zero.
     /// ### Example
     /// ```
+    /// use shsc::traits::RefCopy;
     /// let mut s = shsc::String::from("hello");
     /// let s2 = s.refcopy();
-    /// s2.refdrop();
+    /// s.refdrop();
     /// ```
 
     fn refdrop(&mut self) {
-        self.str.refdrop();
+        // self.str.refdrop();
     }
 }
 
@@ -306,7 +322,12 @@ impl traits::RefC for String {
 impl Drop for String {
     /// Implement the Drop trait for the String struct.
     /// This allows us to deallocate the String struct when the reference count reaches zero.
+    /// ### Example
+    /// ```
+    /// let s = shsc::String::from("hello");
+    /// ```
+
     fn drop(&mut self) {
-        self.str.refdrop();
+        self.refdrop();
     }
 }

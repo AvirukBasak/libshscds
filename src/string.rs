@@ -271,11 +271,17 @@ impl traits::RefCopy for String {
     /// ```
     /// use shsc::traits::RefCopy;
     /// let mut s = shsc::String::from("hello");
-    /// let s2 = s.refcopy();
+    /// {
+    ///     let s2 = s.refcopy();
+    /// }
     /// s.refdrop();
     /// ```
 
     fn refdrop(&mut self) {
+        // Explicit call to refdrop is not necessary
+        // because the Drop trait is implemented for the List struct
+        // so the reference count will be decremented when the string
+        // goes out of scope.
         // self.str.refdrop();
     }
 }

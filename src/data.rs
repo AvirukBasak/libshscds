@@ -301,15 +301,15 @@ impl traits::RefCopy for Data {
         }
     }
 
-    fn refdrop(mut self) {
-        self.decrc();
-        if self.getrc() > 0 {
-            return;
-        }
+    fn refdrop(self) {
     }
 }
 
 impl Drop for Data {
     fn drop(&mut self) {
+        self.decrc();
+        if self.getrc() > 0 {
+            return;
+        }
     }
 }

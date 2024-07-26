@@ -270,12 +270,7 @@ impl traits::RefCopy for Map {
     /// m.refdrop();
     /// ```
 
-    fn refdrop(mut self) {
-        self.decrc();
-        if self.getrc() > 0 {
-            return;
-        }
-        // drop trait is called here
+    fn refdrop(self) {
     }
 }
 
@@ -339,6 +334,10 @@ impl Drop for Map {
     /// ```
 
     fn drop(&mut self) {
+        self.decrc();
+        if self.getrc() > 0 {
+            return;
+        }
         unsafe {
             drop(Box::from_raw(self.map));
             drop(Box::from_raw(self.store));

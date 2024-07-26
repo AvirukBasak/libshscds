@@ -277,12 +277,7 @@ impl traits::RefCopy for String {
     /// s.refdrop();
     /// ```
 
-    fn refdrop(mut self) {
-        self.decrc();
-        if self.getrc() > 0 {
-            return;
-        }
-        // drop trait is called here
+    fn refdrop(self) {
     }
 }
 
@@ -334,5 +329,9 @@ impl Drop for String {
     /// ```
 
     fn drop(&mut self) {
+        self.decrc();
+        if self.getrc() > 0 {
+            return;
+        }
     }
 }

@@ -395,11 +395,7 @@ impl traits::RefCopy for List {
     /// list.refdrop();             // drop original reference copy
     /// ```
 
-    fn refdrop(mut self) {
-        self.decrc();
-        if self.getrc() > 0 {
-            return;
-        }
+    fn refdrop(self) {
         // drop trait is called here
     }
 }
@@ -457,6 +453,7 @@ impl Drop for List {
     /// ```
 
     fn drop(&mut self) {
+        self.decrc();
         if self.getrc() > 0 {
             return;
         }

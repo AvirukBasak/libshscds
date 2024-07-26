@@ -101,6 +101,7 @@ impl traits::Append<char> for crate::String {
     /// * `c` - A native char type
     /// ### Example
     /// ```
+    /// use shsc::traits::Append;
     /// let mut s = shsc::String::from("hello");
     /// s.append(' ');
     /// s.append('w');
@@ -122,6 +123,7 @@ impl traits::Append<&crate::String> for crate::String {
     /// * `str` - A shsc::String struct
     /// ### Example
     /// ```
+    /// use shsc::traits::Append;
     /// let mut s = shsc::String::from("hello");
     /// let s2 = shsc::String::from(" world");
     /// s.append(&s2);
@@ -142,6 +144,7 @@ impl traits::Append<&str> for crate::String {
     /// * `value` - A native str type
     /// ### Example
     /// ```
+    /// use shsc::traits::Append;
     /// let mut s = shsc::String::from("hello");
     /// s.append(" world");
     /// ```
@@ -161,6 +164,7 @@ impl traits::Insert<char> for crate::String {
     /// * `value` - A native char type
     /// ### Example
     /// ```
+    /// use shsc::traits::Insert;
     /// let mut s = shsc::String::from("hello");
     /// s.insert(5, ' ');
     /// s.insert(6, 'w');
@@ -183,6 +187,7 @@ impl traits::Insert<&crate::String> for crate::String {
     /// * `str` - A shsc::String struct
     /// ### Example
     /// ```
+    /// use shsc::traits::Insert;
     /// let mut s = shsc::String::from("hello");
     /// let s2 = shsc::String::from(" world");
     /// s.insert(5, &s2);
@@ -204,6 +209,7 @@ impl traits::Insert<&str> for crate::String {
     /// * `value` - A native str type
     /// ### Example
     /// ```
+    /// use shsc::traits::Insert;
     /// let mut s = shsc::String::from("hello");
     /// s.insert(5, " world");
     /// ```

@@ -1,7 +1,8 @@
 /// Traits for heap based data structures that require reference counting.
 /// ### Example
 /// ```
-/// let mut data = shsc::Data::from(
+/// use shsc::traits::RefC;
+/// let mut data = shsc::todata!(
 ///   shsc::List::from(vec![ shsc::todata!(1), shsc::todata!(2), shsc::todata!(3), ])
 /// );
 /// data.incrc();
@@ -22,6 +23,7 @@ pub trait RefC {
 ///
 /// ### Example
 /// ```
+/// use shsc::traits::RefCopy;
 /// let mut data = shsc::Data::from(
 ///   shsc::List::from(vec![ shsc::todata!(1), shsc::todata!(2), shsc::todata!(3), ])
 /// );

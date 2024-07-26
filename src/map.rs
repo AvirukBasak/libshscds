@@ -1,7 +1,4 @@
-use crate::{
-    traits::{self, RefC, RefCopy},
-    util::alloc,
-};
+use crate::traits::{self, RefC, RefCopy};
 use std::{collections::HashMap, ops, ptr};
 
 pub struct Map {
@@ -11,10 +8,16 @@ pub struct Map {
 }
 
 impl Map {
+    /// Create a new shsc::Map struct.
+    /// ### Example
+    /// ```
+    /// let m = shsc::Map::new();
+    /// ```
+
     pub fn new() -> Self {
         let map = Map {
-            map: alloc::allocate::<HashMap<String, usize>>(1),
-            store: alloc::allocate::<crate::List>(1),
+            map: Box::into_raw(Box::new(HashMap::new())),
+            store: Box::into_raw(Box::new(crate::List::new())),
             refc: 1,
         };
         unsafe {
@@ -24,118 +27,144 @@ impl Map {
         map
     }
 
+    /// Create a new shsc::Map struct from a native HashMap type.
+    /// ### Arguments
+    /// * `hashmap` - A native HashMap type
+    /// ### Returns
+    /// A new Map struct
+    /// ### Example
+    /// ```
+    /// let mut hashmap = std::collections::HashMap::new();
+    /// hashmap.insert("key".to_owned(), shsc::todata!(10));
+    /// let m = shsc::Map::from(hashmap);
+    /// ```
+
     pub fn from(hashmap: HashMap<String, crate::Data>) -> Self {
         let newmap = Map::new();
-        let map = unsafe {
-            newmap
-                .map
-                .as_mut()
-                .expect("shsc::Map::from: undefined index map")
-        };
-        let store = unsafe {
-            newmap
-                .store
-                .as_mut()
-                .expect("shsc::Map::from: undefined data store")
-        };
-        for (key, value) in hashmap {
-            let index = store.len();
-            map.insert(key, index);
-            store.append(value);
+        unsafe {
+            for (key, value) in hashmap {
+                let index = newmap.store.read().len();
+                newmap.map.read().insert(key, index);
+                newmap.store.read().append(value);
+            }
         }
         newmap
     }
 
+    /// Insert a key-value pair into the shsc::Map struct.
+    /// ### Arguments
+    /// * `key` - A native str type
+    /// * `value` - A shsc::Data type
+    /// ### Example
+    /// ```
+    /// let mut m = shsc::Map::new();
+    /// m.insert("key", shsc::todata!(10));
+    /// ```
+
     pub fn insert(&mut self, key: &str, value: crate::Data) {
-        let map = unsafe {
-            self.map
-                .as_mut()
-                .expect("shsc::Map::insert: undefined index map")
-        };
-        let store = unsafe {
-            self.store
-                .as_mut()
-                .expect("shsc::Map::insert: undefined data store")
-        };
-        if map.contains_key(key) {
-            let index: usize = map[key];
-            let storeref = store
-                .get_mut(index)
-                .expect(&format!("shsc::Map::insert: invalid index {}", index));
-            *storeref = value;
-        } else {
-            let index = store.len();
-            map.insert(key.to_owned(), index);
-            store.append(value);
+        unsafe {
+            if self.map.read().contains_key(key) {
+                let index: usize = self.map.read()[key];
+                self.store.read()[index] = value;
+            } else {
+                let index = self.store.read().len();
+                self.map.read().insert(key.to_owned(), index);
+                self.store.read().append(value);
+            }
         }
     }
+
+    /// Get a reference to the shsc::Data type associated with a key.
+    /// ### Arguments
+    /// * `key` - A native str type
+    /// ### Returns
+    /// A reference to the shsc::Data type associated with the key
+    /// ### Example
+    /// ```
+    /// let mut m = shsc::Map::new();
+    /// m.insert("key", shsc::todata!(10));
+    /// let value = m.get("key").unwrap();
+    /// ```
 
     pub fn get(&self, key: &str) -> Option<&crate::Data> {
-        let map = unsafe {
-            self.map
+        unsafe {
+            let store = self
+                .store
                 .as_ref()
-                .expect("shsc::Map::get: undefined index map")
-        };
-        let store = unsafe {
-            self.store
-                .as_ref()
-                .expect("shsc::Map::get: undefined data store")
-        };
-        match map.get(key) {
-            Some(&index) => Some(
-                store
-                    .get(index)
-                    .expect(&format!("shsc::Map::get: invalid index {}", index)),
-            ),
-            None => None,
+                .expect("shsc::Map::get: undefined data store");
+            match self.map.read().get(key) {
+                Some(&index) => store.get(index),
+                None => None,
+            }
         }
     }
+
+    /// Get a mutable reference to the shsc::Data type associated with a key.
+    /// ### Arguments
+    /// * `key` - A native str type
+    /// ### Returns
+    /// A mutable reference to the shsc::Data type associated with the key
+    /// ### Example
+    /// ```
+    /// let mut m = shsc::Map::new();
+    /// m.insert("key", shsc::todata!(10));
+    /// let value = m.get_mut("key").unwrap();
+    /// *value = shsc::todata!(20);
+    /// ```
 
     pub fn get_mut(&mut self, key: &str) -> Option<&mut crate::Data> {
-        let map = unsafe {
-            self.map
+        unsafe {
+            let store = self
+                .store
                 .as_mut()
-                .expect("shsc::Map::get_mut: undefined index map")
-        };
-        let store = unsafe {
-            self.store
-                .as_mut()
-                .expect("shsc::Map::get_mut: undefined data store")
-        };
-        match map.get(key) {
-            Some(&index) => Some(
-                store
-                    .get_mut(index)
-                    .expect(&format!("shsc::Map::get_mut: invalid index {}", index)),
-            ),
-            None => None,
+                .expect("shsc::Map::get_mut: undefined data store");
+            match self.map.read().get(key) {
+                Some(&index) => store.get_mut(index),
+                None => None,
+            }
         }
     }
 
+    /// Remove a key-value pair from the shsc::Map struct.
+    /// ### Arguments
+    /// * `key` - A native str type
+    /// ### Returns
+    /// The shsc::Data type associated with the key
+    /// ### Example
+    /// ```
+    /// let mut m = shsc::Map::new();
+    /// m.insert("key", shsc::todata!(10));
+    /// let value = m.remove("key").unwrap();
+    /// ```
+
     pub fn remove(&mut self, key: &str) -> Option<crate::Data> {
-        let map = unsafe {
-            self.map
-                .as_mut()
-                .expect("shsc::Map::remove: undefined index map")
-        };
-        let store = unsafe {
-            self.store
-                .as_mut()
-                .expect("shsc::Map::remove: undefined data store")
-        };
-        match map.remove(key) {
-            Some(index) => {
-                let tmp = store[index].refcopy();
-                store[index] = crate::Data::NULL;
-                Some(tmp)
+        unsafe {
+            match self.map.read().remove(key) {
+                Some(index) => {
+                    let tmp = self.store.read()[index].refcopy();
+                    self.store.read()[index] = crate::Data::NULL;
+                    Some(tmp)
+                }
+                None => None,
             }
-            None => None,
         }
     }
 }
 
 impl ops::Index<&str> for Map {
     type Output = crate::Data;
+
+    /// Get a reference to the shsc::Data type associated with a key.
+    /// ### Arguments
+    /// * `key` - A native str type
+    /// ### Returns
+    /// A reference to the shsc::Data type associated with the key
+    /// ### Example
+    /// ```
+    /// let mut m = shsc::Map::new();
+    /// m.insert("key", shsc::todata!(10));
+    /// let value = &m["key"];
+    /// ```
 
     fn index(&self, key: &str) -> &crate::Data {
         self.get(key)
@@ -144,6 +173,18 @@ impl ops::Index<&str> for Map {
 }
 
 impl ops::IndexMut<&str> for Map {
+    /// Get a mutable reference to the shsc::Data type associated with a key.
+    /// ### Arguments
+    /// * `key` - A native str type
+    /// ### Returns
+    /// A mutable reference to the shsc::Data type associated with the key
+    /// ### Example
+    /// ```
+    /// let mut m = shsc::Map::new();
+    /// m.insert("key", shsc::todata!(10));
+    /// m["key"] = shsc::todata!(20);
+    /// ```
+
     fn index_mut(&mut self, key: &str) -> &mut crate::Data {
         self.get_mut(key)
             .expect(&format!("shsc::Map::index_mut: invalid key {}", key))
@@ -151,6 +192,21 @@ impl ops::IndexMut<&str> for Map {
 }
 
 impl traits::ToStr for Map {
+    /// Get a string representation of the shsc::Map struct.
+    /// ### Returns
+    /// A string representation of the shsc::Map struct
+    /// ### Example
+    /// ```
+    /// use shsc::traits::ToStr;
+    /// let mut m = shsc::Map::new();
+    /// m.insert("key", shsc::todata!(10));
+    /// m.insert("key2", shsc::todata!(20));
+    /// m.insert("key3", shsc::todata!(30));
+    /// m.insert("key4", shsc::todata!(40));
+    /// let s = m.tostr();
+    /// println!("{}", s);
+    /// ```
+
     fn tostr(&self) -> String {
         let map = unsafe {
             self.map
@@ -163,12 +219,15 @@ impl traits::ToStr for Map {
                 .expect("shsc::Map::tostr: undefined data store")
         };
         let mut result = String::from("{");
-        for (key, &index) in map.iter() {
+        for (i, (key, &index)) in map.iter().enumerate() {
             let value = store
                 .get(index)
                 .expect(&format!("shsc::Map::tostr: invalid index {}", index));
+            if value.is_null() {
+                continue;
+            }
             result.push_str(&format!("{}: {}", key, value.tostr()));
-            if index != store.len() - 1 {
+            if i < store.len() - 1 {
                 result.push_str(", ");
             }
         }
@@ -178,6 +237,17 @@ impl traits::ToStr for Map {
 }
 
 impl traits::RefCopy for Map {
+    /// Implement the RefCopy trait for the Map struct.
+    /// This allows us to create a new Map struct from an existing Map struct.
+    /// ### Returns
+    /// A reference counted copy of the Map struct
+    /// ### Example
+    /// ```
+    /// use shsc::traits::RefCopy;
+    /// let mut m = shsc::Map::new();
+    /// let m2 = m.refcopy();
+    /// ```
+
     fn refcopy(&mut self) -> Self {
         self.incrc();
         Map {
@@ -187,59 +257,57 @@ impl traits::RefCopy for Map {
         }
     }
 
-    fn refdrop(&mut self) {
-        let map = unsafe {
-            self.map
-                .as_mut()
-                .expect("shsc::Map::refdrop: undefined index map")
-        };
-        let store = unsafe {
-            self.store
-                .as_mut()
-                .expect("shsc::Map::refdrop: undefined data store")
-        };
+    /// Implement the RefCopy trait for the Map struct.
+    /// This allows us to deallocate the Map struct when the reference count reaches zero.
+    /// Map will be deallocated if the reference count reaches zero.
+    /// ### Example
+    /// ```
+    /// use shsc::traits::RefCopy;
+    /// let mut m = shsc::Map::new();
+    /// {
+    ///     let m2 = m.refcopy();
+    /// }
+    /// m.refdrop();
+    /// ```
+
+    fn refdrop(mut self) {
         self.decrc();
-        if self.getrc() == 0 {
-            for i in 0..store.len() {
-                store[i].refdrop();
-            }
-            alloc::deallocate(map, 1);
-            alloc::deallocate(store, 1);
+        if self.getrc() > 0 {
+            return;
         }
+        // drop trait is called here
     }
 }
 
 impl Clone for Map {
+    /// Implement the Clone trait for the Map struct.
+    /// This allows us to create a deep copy of the Map struct.
+    /// Results in a new Map struct with a reference count of 1.
+    /// ### Returns
+    /// A deep copy of the Map struct
+    /// ### Example
+    /// ```
+    /// let m = shsc::Map::new();
+    /// let m2 = m.clone();
+    /// ```
+
     fn clone(&self) -> Self {
         let newmap = Map::new();
-        let map = unsafe {
-            newmap
-                .map
-                .as_mut()
-                .expect("shsc::Map::clone: undefined index map")
-        };
-        let store = unsafe {
-            newmap
+        unsafe {
+            let oldstore = self
                 .store
-                .as_mut()
-                .expect("shsc::Map::clone: undefined data store")
-        };
-        let oldmap = unsafe {
-            self.map
                 .as_ref()
-                .expect("shsc::Map::clone: undefined index map")
-        };
-        let oldstore = unsafe {
-            self.store
-                .as_ref()
-                .expect("shsc::Map::clone: undefined data store")
-        };
-        for (key, &index) in oldmap.iter() {
-            let value = oldstore
-                .get(index)
-                .expect(&format!("shsc::Map::clone: invalid index {}", index));
-            map.insert(key.clone(), store.len());
-            store.append(value.clone());
+                .expect("shsc::Map::clone: undefined data store");
+            for (key, &index) in self.map.read().iter() {
+                let value = oldstore
+                    .get(index)
+                    .expect(&format!("shsc::Map::clone: invalid index {}", index));
+                newmap
+                    .map
+                    .read()
+                    .insert(key.clone(), newmap.store.read().len());
+                newmap.store.read().append(value.clone());
+            }
         }
         newmap
     }
@@ -263,7 +331,17 @@ impl traits::RefC for Map {
 }
 
 impl Drop for Map {
+    /// Implement the Drop trait for the Map struct.
+    /// This allows us to deallocate the Map struct when it goes out of scope.
+    /// ### Example
+    /// ```
+    /// let m = shsc::Map::new();
+    /// ```
+
     fn drop(&mut self) {
-        self.refdrop();
+        unsafe {
+            drop(Box::from_raw(self.map));
+            drop(Box::from_raw(self.store));
+        }
     }
 }

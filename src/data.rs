@@ -1,4 +1,4 @@
-use crate::traits::{self, RefC, RefCopy};
+use crate::traits::{self, RefC};
 
 /// Converts the given data into a `Data` instance using `shsc::Data::from`.
 /// ### Arguments
@@ -301,26 +301,15 @@ impl traits::RefCopy for Data {
         }
     }
 
-    fn refdrop(&mut self) {
-        match &mut self.data {
-            crate::DataTypes::STRING(value) => value.refdrop(),
-            crate::DataTypes::LIST(value) => value.refdrop(),
-            crate::DataTypes::MAP(value) => value.refdrop(),
-            _ => (),
+    fn refdrop(mut self) {
+        self.decrc();
+        if self.getrc() > 0 {
+            return;
         }
     }
 }
 
 impl Drop for Data {
     fn drop(&mut self) {
-        self.decrc();
-        if self.getrc() == 0 {
-            match &mut self.data {
-                crate::DataTypes::STRING(value) => value.refdrop(),
-                crate::DataTypes::LIST(value) => value.refdrop(),
-                crate::DataTypes::MAP(value) => value.refdrop(),
-                _ => (),
-            }
-        }
     }
 }

@@ -31,5 +31,5 @@ pub trait RefC {
 
 pub trait RefCopy {
     fn refcopy(&mut self) -> Self;
-    fn refdrop(&mut self);
+    fn refdrop(self);
 }

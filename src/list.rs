@@ -1,4 +1,4 @@
-use crate::traits::{self, RefC, RefCopy};
+use crate::traits::{self, RefC};
 use crate::util::alloc;
 use std::{ops, ptr};
 
@@ -395,21 +395,12 @@ impl traits::RefCopy for List {
     /// list.refdrop();             // drop original reference copy
     /// ```
 
-    fn refdrop(&mut self) {
+    fn refdrop(mut self) {
         self.decrc();
-        if self.getrc() == 0 {
-            for i in 0..self.rows {
-                unsafe {
-                    let row = self.list.add(i);
-                    for j in 0..self.cols {
-                        let data = row.read().add(j);
-                        data.read().refdrop();
-                    }
-                    alloc::deallocate::<crate::Data>(row.read(), self.cols);
-                }
-            }
-            alloc::deallocate::<*mut crate::Data>(self.list, self.rows);
+        if self.getrc() > 0 {
+            return;
         }
+        // drop trait is called here
     }
 }
 
@@ -464,7 +455,21 @@ impl Drop for List {
     /// ```
     /// let list = shsc::List::from(vec![ shsc::todata!(1), shsc::todata!(2), shsc::todata!(3), ]);
     /// ```
+
     fn drop(&mut self) {
-        self.refdrop();
+        if self.getrc() > 0 {
+            return;
+        }
+        for i in 0..self.rows {
+            unsafe {
+                let row = self.list.add(i).read();
+                for j in 0..self.cols {
+                    // drop data in this scope
+                    let _ = row.add(j).read();
+                }
+                alloc::deallocate::<crate::Data>(row, self.cols);
+            }
+        }
+        alloc::deallocate::<*mut crate::Data>(self.list, self.rows);
     }
 }

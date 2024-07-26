@@ -1,4 +1,4 @@
-use crate::traits::{self, Append, RefCopy};
+use crate::traits::{self, Append, RefC};
 
 pub struct String {
     str: crate::List,
@@ -277,19 +277,19 @@ impl traits::RefCopy for String {
     /// s.refdrop();
     /// ```
 
-    fn refdrop(&mut self) {
-        // Explicit call to refdrop is not necessary
-        // because the Drop trait is implemented for the List struct
-        // so the reference count will be decremented when the string
-        // goes out of scope.
-        // self.str.refdrop();
+    fn refdrop(mut self) {
+        self.decrc();
+        if self.getrc() > 0 {
+            return;
+        }
+        // drop trait is called here
     }
 }
 
 impl Clone for String {
     /// Implement the Clone trait for the String struct.
     /// This allows us to create a deep copy of the String struct.
-    /// Resultsin a new String struct with a reference count of 1.
+    /// Results in a new String struct with a reference count of 1.
     /// ### Returns
     /// A deep copy of the String struct
     /// ### Example
@@ -334,6 +334,5 @@ impl Drop for String {
     /// ```
 
     fn drop(&mut self) {
-        self.refdrop();
     }
 }

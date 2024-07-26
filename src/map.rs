@@ -1,5 +1,5 @@
 use crate::traits::{self, RefC, RefCopy};
-use std::{collections::HashMap, ops, ptr};
+use std::{collections::HashMap, ops};
 
 pub struct Map {
     map: *mut HashMap<String, usize>,
@@ -20,10 +20,6 @@ impl Map {
             store: Box::into_raw(Box::new(crate::List::new())),
             refc: 1,
         };
-        unsafe {
-            ptr::write(map.map, HashMap::new());
-            ptr::write(map.store, crate::List::new());
-        }
         map
     }
 

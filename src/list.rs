@@ -1,4 +1,4 @@
-use crate::traits::{self, RefC};
+use crate::traits::{self, RefC, RefCopy};
 use crate::util::alloc;
 use std::{ops, ptr};
 
@@ -111,7 +111,7 @@ impl List {
             let row = index / (*self.cols);
             let col = index % (*self.cols);
             let src = (*self.list.add(row)).add(col);
-            src.as_ref()
+            Some(&*src)
         }
     }
 
@@ -138,7 +138,37 @@ impl List {
             let row = index / (*self.cols);
             let col = index % (*self.cols);
             let src = (*self.list.add(row)).add(col);
-            src.as_mut()
+            Some(&mut *src)
+        }
+    }
+
+    /// Move data from index and replace with shsc::Data::NULL
+    /// ### Arguments
+    /// * `index` - Index of data
+    /// ### Returns
+    /// Data at index
+    /// ### Example
+    /// ```
+    /// let mut list = shsc::List::from(vec![
+    ///     shsc::todata!(1),
+    ///     shsc::todata!(2),
+    ///     shsc::todata!(3),
+    /// ]);
+    /// let data = list.take(1).unwrap();
+    /// ```
+
+    pub fn take(&self, index: usize) -> Option<crate::Data> {
+        unsafe {
+            if index >= (*self.len) {
+                return None;
+            }
+            let row = index / (*self.cols);
+            let col = index % (*self.cols);
+            let src = (*self.list.add(row)).add(col);
+            let tmp = (*src).refcopy();
+            src.read().refdrop();
+            *src = crate::Data::NULL;
+            Some(tmp)
         }
     }
 
@@ -179,10 +209,7 @@ impl List {
                 let row = i / (*self.cols);
                 let col = i % (*self.cols);
                 let src = (*self.list.add(row)).add(col);
-                vec.push(
-                    src.as_mut()
-                        .expect(&format!("shsc::List: as_vec: undefined data at {}", i)),
-                );
+                vec.push(&*src);
             }
             vec
         }
@@ -208,10 +235,7 @@ impl List {
                 let row = i / (*self.cols);
                 let col = i % (*self.cols);
                 let src = (*self.list.add(row)).add(col);
-                vec.push(
-                    src.as_mut()
-                        .expect(&format!("shsc::List: as_vec_mut: undefined data at {}", i)),
-                );
+                vec.push(&mut *src);
             }
             vec
         }
@@ -254,7 +278,7 @@ impl List {
                 let col1 = (i + 1) % (*self.cols);
                 let src = (*self.list.add(row)).add(col);
                 let dest = (*self.list.add(row1)).add(col1);
-                dest.write(src.read());
+                *dest = (*src).refcopy();
             }
             // insert data at index
             let row = index / (*self.cols);
@@ -284,7 +308,8 @@ impl List {
             if index >= (*self.len) {
                 panic!("shsc::List: remove: index out of bounds for {}", index);
             }
-            let mut tmp = crate::Data::NULL;
+            let removed =
+                (*(*self.list.add(index / (*self.cols))).add(index % (*self.cols))).refcopy();
             // shift elements to the left
             for i in index..(*self.len) - 1 {
                 let row = i / (*self.cols);
@@ -292,13 +317,13 @@ impl List {
                 let row1 = (i + 1) / (*self.cols);
                 let col1 = (i + 1) % (*self.cols);
                 let src = (*self.list.add(row1)).add(col1);
-                tmp = src.read();
                 let dest = (*self.list.add(row)).add(col);
-                dest.write(src.read());
+                dest.read().refdrop();
+                *dest = (*src).refcopy();
             }
             // decrement length
             *self.len -= 1;
-            tmp
+            removed
         }
     }
 }
@@ -504,7 +529,7 @@ impl Drop for List {
                 let row = *self.list.add(i);
                 for j in 0..(*self.cols) {
                     // drop data in this scope
-                    let _ = row.add(j).read();
+                    row.add(j).read().refdrop();
                 }
                 alloc::deallocate::<crate::Data>(row, *self.cols);
             }

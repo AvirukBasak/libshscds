@@ -1,10 +1,10 @@
-use crate::traits::{self, RefC, RefCopy};
+use crate::traits::{self, RefC};
 use std::{collections::HashMap, ops};
 
 pub struct Map {
     map: *mut HashMap<String, usize>,
     store: *mut crate::List,
-    refc: i64,
+    refc: *mut i64,
 }
 
 impl Map {
@@ -18,7 +18,7 @@ impl Map {
         let map = Map {
             map: Box::into_raw(Box::new(HashMap::new())),
             store: Box::into_raw(Box::new(crate::List::new())),
-            refc: 1,
+            refc: Box::into_raw(Box::new(0)),
         };
         map
     }
@@ -39,9 +39,9 @@ impl Map {
         let newmap = Map::new();
         unsafe {
             for (key, value) in hashmap {
-                let index = newmap.store.as_ref().unwrap().len();
-                newmap.map.as_mut().unwrap().insert(key, index);
-                newmap.store.as_mut().unwrap().append(value);
+                let index = (*newmap.store).len();
+                (*newmap.map).insert(key, index);
+                (*newmap.store).append(value);
             }
         }
         newmap
@@ -59,13 +59,13 @@ impl Map {
 
     pub fn insert(&mut self, key: &str, value: crate::Data) {
         unsafe {
-            if self.map.as_ref().unwrap().contains_key(key) {
-                let index: usize = self.map.as_ref().unwrap()[key];
-                self.store.as_mut().unwrap()[index] = value;
+            if (*self.map).contains_key(key) {
+                let index: usize = (*self.map)[key];
+                (*self.store)[index] = value;
             } else {
-                let index = self.store.as_ref().unwrap().len();
-                self.map.as_mut().unwrap().insert(key.to_owned(), index);
-                self.store.as_mut().unwrap().append(value);
+                let index = (*self.store).len();
+                (*self.map).insert(key.to_owned(), index);
+                (*self.store).append(value);
             }
         }
     }
@@ -88,7 +88,7 @@ impl Map {
                 .store
                 .as_ref()
                 .expect("shsc::Map::get: undefined data store");
-            match self.map.as_ref().unwrap().get(key) {
+            match (*self.map).get(key) {
                 Some(&index) => store.get(index),
                 None => None,
             }
@@ -114,8 +114,34 @@ impl Map {
                 .store
                 .as_mut()
                 .expect("shsc::Map::get_mut: undefined data store");
-            match self.map.as_ref().unwrap().get(key) {
+            match (*self.map).get(key) {
                 Some(&index) => store.get_mut(index),
+                None => None,
+            }
+        }
+    }
+
+    /// Move the shsc::Data type associated with a key out of the shsc::Map struct.
+    /// Replace the shsc::Data type with shsc::Data::NULL
+    /// ### Arguments
+    /// * `key` - A native str type
+    /// ### Returns
+    /// The shsc::Data type associated with the key
+    /// ### Example
+    /// ```
+    /// let mut m = shsc::Map::new();
+    /// m.insert("key", shsc::todata!(10));
+    /// let value = m.take("key").unwrap();
+    /// ```
+
+    pub fn take(&self, key: &str) -> Option<crate::Data> {
+        unsafe {
+            let store = self
+                .store
+                .as_ref()
+                .expect("shsc::Map::get_into: undefined data store");
+            match (*self.map).get(key) {
+                Some(&index) => store.take(index),
                 None => None,
             }
         }
@@ -130,17 +156,14 @@ impl Map {
     /// ```
     /// let mut m = shsc::Map::new();
     /// m.insert("key", shsc::todata!(10));
+    /// m.insert("key2", shsc::todata!(20));
     /// let value = m.remove("key").unwrap();
     /// ```
 
     pub fn remove(&mut self, key: &str) -> Option<crate::Data> {
         unsafe {
-            match self.map.as_mut().unwrap().remove(key) {
-                Some(index) => {
-                    let tmp = self.store.as_mut().unwrap()[index].refcopy();
-                    self.store.as_mut().unwrap()[index] = crate::Data::NULL;
-                    Some(tmp)
-                }
+            match (*self.map).remove(key) {
+                Some(index) => (*self.store).take(index),
                 None => None,
             }
         }
@@ -266,7 +289,9 @@ impl traits::RefCopy for Map {
     /// m.refdrop();
     /// ```
 
-    fn refdrop(self) {}
+    fn refdrop(self) {
+        // drop trait is called here
+    }
 }
 
 impl Clone for Map {
@@ -288,7 +313,7 @@ impl Clone for Map {
                 .store
                 .as_ref()
                 .expect("shsc::Map::clone: undefined data store");
-            for (key, &index) in self.map.as_ref().unwrap().iter() {
+            for (key, &index) in (*self.map).iter() {
                 let value = oldstore
                     .get(index)
                     .expect(&format!("shsc::Map::clone: invalid index {}", index));
@@ -296,8 +321,8 @@ impl Clone for Map {
                     .map
                     .as_mut()
                     .unwrap()
-                    .insert(key.clone(), newmap.store.as_ref().unwrap().len());
-                newmap.store.as_mut().unwrap().append(value.clone());
+                    .insert(key.clone(), (*newmap.store).len());
+                (*newmap.store).append(value.clone());
             }
         }
         newmap
@@ -306,18 +331,20 @@ impl Clone for Map {
 
 impl traits::RefC for Map {
     fn incrc(&mut self) {
-        self.refc += 1;
+        unsafe { (*self.refc) += 1 };
     }
 
     fn decrc(&mut self) {
-        self.refc -= 1;
-        if self.refc < 0 {
-            self.refc = 0;
+        unsafe {
+            *self.refc -= 1;
+            if (*self.refc) < 0 {
+                *self.refc = 0;
+            }
         }
     }
 
     fn getrc(&self) -> i64 {
-        self.refc
+        unsafe { *self.refc }
     }
 }
 
@@ -337,6 +364,7 @@ impl Drop for Map {
         unsafe {
             drop(Box::from_raw(self.map));
             drop(Box::from_raw(self.store));
+            drop(Box::from_raw(self.refc));
         }
     }
 }

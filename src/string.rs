@@ -278,12 +278,13 @@ impl traits::RefCopy for String {
     /// use shsc::traits::RefCopy;
     /// let mut s = shsc::String::from("hello");
     /// {
-    ///     let s2 = s.refcopy();
-    /// }
-    /// s.refdrop();
+    ///     let s2 = s.refcopy(); // new reference copy
+    /// }                         // drop reference copy
+    /// s.refdrop();              // drop original reference copy
     /// ```
 
     fn refdrop(self) {
+        // drop trait is called here
     }
 }
 

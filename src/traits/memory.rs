@@ -24,11 +24,15 @@ pub trait RefC {
 /// ### Example
 /// ```
 /// use shsc::traits::RefCopy;
-/// let mut data = shsc::Data::from(
-///   shsc::List::from(vec![ shsc::todata!(1), shsc::todata!(2), shsc::todata!(3), ])
-/// );
-/// let mut data2 = data.refcopy();
-/// data.refdrop();
+/// let mut data = shsc::Data::from(shsc::List::from(vec![
+///     shsc::todata!(1),
+///     shsc::todata!(2),
+///     shsc::todata!(3)
+/// ]));
+/// {
+///     let data2 = data.refcopy();     // new reference copy
+/// }                                   // drop reference copy
+/// data.refdrop();                     // drop original reference copy
 /// ```
 
 pub trait RefCopy {

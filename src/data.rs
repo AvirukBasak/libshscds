@@ -302,6 +302,7 @@ impl traits::RefCopy for Data {
     }
 
     fn refdrop(self) {
+        // drop trait is called here
     }
 }
 

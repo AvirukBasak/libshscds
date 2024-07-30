@@ -6,10 +6,10 @@ const DEFAULT_COLS: usize = 32;
 
 pub struct List {
     list: *mut *mut crate::Data,
-    len: usize,
-    rows: usize,
-    cols: usize,
-    refc: i64,
+    len: *mut usize,
+    rows: *mut usize,
+    cols: *mut usize,
+    refc: *mut i64,
 }
 
 impl List {
@@ -24,10 +24,10 @@ impl List {
     pub fn new() -> Self {
         let list = List {
             list: ptr::null_mut(),
-            len: 0,
-            rows: 0,
-            cols: DEFAULT_COLS,
-            refc: 1,
+            len: Box::into_raw(Box::new(0)),
+            rows: Box::into_raw(Box::new(0)),
+            cols: Box::into_raw(Box::new(DEFAULT_COLS)),
+            refc: Box::into_raw(Box::new(1)),
         };
         list
     }
@@ -66,28 +66,26 @@ impl List {
     /// ```
 
     pub fn append(&mut self, data: crate::Data) {
-        // if list has reached capacity, add new rows
-        if self.len >= self.rows * self.cols {
-            // reallocate list
-            self.list = alloc::reallocate::<*mut crate::Data>(self.list, self.rows + 1);
-            self.rows += 1;
-            // allocate new row
-            unsafe {
-                let dest = self.list.add(self.rows - 1);
-                let newrow = alloc::allocate::<crate::Data>(self.cols);
+        unsafe {
+            // if list has reached capacity, add new rows
+            if (*self.len) >= (*self.rows) * (*self.cols) {
+                // reallocate list
+                self.list = alloc::reallocate::<*mut crate::Data>(self.list, (*self.rows) + 1);
+                *self.rows += 1;
+                // allocate new row
+                let dest = self.list.add((*self.rows) - 1);
+                let newrow = alloc::allocate::<crate::Data>(*self.cols);
                 dest.write(newrow);
             }
-        }
-        // else put data in list[len / rows][len % cols]
-        let row = self.len / self.cols;
-        let col = self.len % self.cols;
-        // write data to list
-        unsafe {
-            let dest = self.list.add(row).read().add(col);
+            // else put data in list[len / rows][len % cols]
+            let row = (*self.len) / (*self.cols);
+            let col = (*self.len) % (*self.cols);
+            // write data to list
+            let dest = (*self.list.add(row)).add(col);
             dest.write(data);
+            // increment length
+            *self.len += 1;
         }
-        // increment length
-        self.len += 1;
     }
 
     /// Get data at index
@@ -106,13 +104,13 @@ impl List {
     /// ```
 
     pub fn get(&self, index: usize) -> Option<&crate::Data> {
-        if index >= self.len {
-            return None;
-        }
-        let row = index / self.cols;
-        let col = index % self.cols;
         unsafe {
-            let src = self.list.add(row).read().add(col);
+            if index >= (*self.len) {
+                return None;
+            }
+            let row = index / (*self.cols);
+            let col = index % (*self.cols);
+            let src = (*self.list.add(row)).add(col);
             src.as_ref()
         }
     }
@@ -133,13 +131,13 @@ impl List {
     /// ```
 
     pub fn get_mut(&mut self, index: usize) -> Option<&mut crate::Data> {
-        if index >= self.len {
-            return None;
-        }
-        let row = index / self.cols;
-        let col = index % self.cols;
         unsafe {
-            let src = self.list.add(row).read().add(col);
+            if index >= (*self.len) {
+                return None;
+            }
+            let row = index / (*self.cols);
+            let col = index % (*self.cols);
+            let src = (*self.list.add(row)).add(col);
             src.as_mut()
         }
     }
@@ -158,7 +156,7 @@ impl List {
     /// ```
 
     pub fn len(&self) -> usize {
-        self.len
+        unsafe { *self.len }
     }
 
     /// Get list as vector
@@ -166,24 +164,28 @@ impl List {
     /// List as vector
     /// ### Example
     /// ```
-    /// let mut list = shsc::List::from(vec![ shsc::todata!(1), shsc::todata!(2), shsc::todata!(3), ]);
+    /// let mut list = shsc::List::from(vec![
+    ///     shsc::todata!(1),
+    ///     shsc::todata!(2),
+    ///     shsc::todata!(3),
+    /// ]);
     /// let vec = list.as_vec();
     /// ```
 
     pub fn as_vec(&self) -> Vec<&crate::Data> {
-        let mut vec: Vec<&crate::Data> = Vec::new();
-        for i in 0..self.len {
-            let row = i / self.cols;
-            let col = i % self.cols;
-            unsafe {
-                let src = self.list.add(row).read().add(col);
+        unsafe {
+            let mut vec: Vec<&crate::Data> = Vec::new();
+            for i in 0..(*self.len) {
+                let row = i / (*self.cols);
+                let col = i % (*self.cols);
+                let src = (*self.list.add(row)).add(col);
                 vec.push(
                     src.as_mut()
                         .expect(&format!("shsc::List: as_vec: undefined data at {}", i)),
                 );
             }
+            vec
         }
-        vec
     }
 
     /// Get list as vector of mutable data
@@ -191,24 +193,28 @@ impl List {
     /// List as vector of mutable data
     /// ### Example
     /// ```
-    /// let mut list = shsc::List::from(vec![ shsc::todata!(1), shsc::todata!(2), shsc::todata!(3), ]);
+    /// let mut list = shsc::List::from(vec![
+    ///     shsc::todata!(1),
+    ///     shsc::todata!(2),
+    ///     shsc::todata!(3),
+    /// ]);
     /// let vec = list.as_vec_mut();
     /// ```
 
     pub fn as_vec_mut(&mut self) -> Vec<&mut crate::Data> {
-        let mut vec = Vec::new();
-        for i in 0..self.len {
-            let row = i / self.cols;
-            let col = i % self.cols;
-            unsafe {
-                let src = self.list.add(row).read().add(col);
+        unsafe {
+            let mut vec = Vec::new();
+            for i in 0..(*self.len) {
+                let row = i / (*self.cols);
+                let col = i % (*self.cols);
+                let src = (*self.list.add(row)).add(col);
                 vec.push(
                     src.as_mut()
                         .expect(&format!("shsc::List: as_vec_mut: undefined data at {}", i)),
                 );
             }
+            vec
         }
-        vec
     }
 
     /// Insert data at index
@@ -217,47 +223,47 @@ impl List {
     /// * `data` - Data to insert
     /// ### Example
     /// ```
-    /// let mut list = shsc::List::from(vec![ shsc::todata!(1), shsc::todata!(2), shsc::todata!(3), ]);
+    /// let mut list = shsc::List::from(vec![
+    ///     shsc::todata!(1),
+    ///     shsc::todata!(2),
+    ///     shsc::todata!(3),
+    /// ]);
     /// list.insert(1, shsc::todata!(4));
     /// ```
 
     pub fn insert(&mut self, index: usize, data: crate::Data) {
-        if index > self.len() {
-            panic!("shsc::List: insert: index out of bounds for {}", index);
-        }
-        // if list has reached capacity, add new rows
-        if self.len >= self.rows * self.cols {
-            // reallocate list
-            self.list = alloc::reallocate::<*mut crate::Data>(self.list, self.rows + 1);
-            self.rows += 1;
-            // allocate new row
-            unsafe {
-                let dest = self.list.add(self.rows - 1);
-                let newrow = alloc::allocate::<crate::Data>(self.cols);
+        unsafe {
+            if index > (*self.len) {
+                panic!("shsc::List: insert: index out of bounds for {}", index);
+            }
+            // if list has reached capacity, add new rows
+            if (*self.len) >= (*self.rows) * (*self.cols) {
+                // reallocate list
+                self.list = alloc::reallocate::<*mut crate::Data>(self.list, (*self.rows) + 1);
+                *self.rows += 1;
+                // allocate new row
+                let dest = self.list.add((*self.rows) - 1);
+                let newrow = alloc::allocate::<crate::Data>(*self.cols);
                 dest.write(newrow);
             }
-        }
-        // shift elements to the right
-        for i in (index..self.len).rev() {
-            let row = i / self.cols;
-            let col = i % self.cols;
-            let row1 = (i + 1) / self.cols;
-            let col1 = (i + 1) % self.cols;
-            unsafe {
-                let src = self.list.add(row).read().add(col);
-                let dest = self.list.add(row1).read().add(col1);
+            // shift elements to the right
+            for i in (index..(*self.len)).rev() {
+                let row = i / (*self.cols);
+                let col = i % (*self.cols);
+                let row1 = (i + 1) / (*self.cols);
+                let col1 = (i + 1) % (*self.cols);
+                let src = (*self.list.add(row)).add(col);
+                let dest = (*self.list.add(row1)).add(col1);
                 dest.write(src.read());
             }
-        }
-        // insert data at index
-        let row = index / self.cols;
-        let col = index % self.cols;
-        unsafe {
-            let dest = self.list.add(row).read().add(col);
+            // insert data at index
+            let row = index / (*self.cols);
+            let col = index % (*self.cols);
+            let dest = (*self.list.add(row)).add(col);
             dest.write(data);
+            // increment length
+            *self.len += 1;
         }
-        // increment length
-        self.len += 1;
     }
 
     /// Remove data at index
@@ -265,31 +271,35 @@ impl List {
     /// * `index` - Index to remove data
     /// ### Example
     /// ```
-    /// let mut list = shsc::List::from(vec![ shsc::todata!(1), shsc::todata!(2), shsc::todata!(3), ]);
+    /// let mut list = shsc::List::from(vec![
+    ///     shsc::todata!(1),
+    ///     shsc::todata!(2),
+    ///     shsc::todata!(3),
+    /// ]);
     /// list.remove(1);
     /// ```
 
     pub fn remove(&mut self, index: usize) -> crate::Data {
-        if index >= self.len {
-            panic!("shsc::List: remove: index out of bounds for {}", index);
-        }
-        let mut tmp = crate::Data::NULL;
-        // shift elements to the left
-        for i in index..self.len - 1 {
-            let row = i / self.cols;
-            let col = i % self.cols;
-            let row1 = (i + 1) / self.cols;
-            let col1 = (i + 1) % self.cols;
-            unsafe {
-                let src = self.list.add(row1).read().add(col1);
+        unsafe {
+            if index >= (*self.len) {
+                panic!("shsc::List: remove: index out of bounds for {}", index);
+            }
+            let mut tmp = crate::Data::NULL;
+            // shift elements to the left
+            for i in index..(*self.len) - 1 {
+                let row = i / (*self.cols);
+                let col = i % (*self.cols);
+                let row1 = (i + 1) / (*self.cols);
+                let col1 = (i + 1) % (*self.cols);
+                let src = (*self.list.add(row1)).add(col1);
                 tmp = src.read();
-                let dest = self.list.add(row).read().add(col);
+                let dest = (*self.list.add(row)).add(col);
                 dest.write(src.read());
             }
+            // decrement length
+            *self.len -= 1;
+            tmp
         }
-        // decrement length
-        self.len -= 1;
-        tmp
     }
 }
 
@@ -304,7 +314,11 @@ impl ops::Index<usize> for List {
     /// Data at index
     /// ### Example
     /// ```
-    /// let list = shsc::List::from(vec![ shsc::todata!(1), shsc::todata!(2), shsc::todata!(3), ]);
+    /// let list = shsc::List::from(vec![
+    ///     shsc::todata!(1),
+    ///     shsc::todata!(2),
+    ///     shsc::todata!(3),
+    /// ]);
     /// let data = &list[1];
     /// ```
 
@@ -323,7 +337,11 @@ impl ops::IndexMut<usize> for List {
     /// Mutable data at index
     /// ### Example
     /// ```
-    /// let mut list = shsc::List::from(vec![ shsc::todata!(1), shsc::todata!(2), shsc::todata!(3), ]);
+    /// let mut list = shsc::List::from(vec![
+    ///     shsc::todata!(1),
+    ///     shsc::todata!(2),
+    ///     shsc::todata!(3),
+    /// ]);
     /// list[1] = shsc::todata!(4);
     /// ```
 
@@ -342,7 +360,11 @@ impl traits::ToStr for List {
     /// ### Example
     /// ```
     /// use crate::shsc::traits::ToStr;
-    /// let list = shsc::List::from(vec![ shsc::todata!(1), shsc::todata!(2), shsc::todata!(3), ]);
+    /// let list = shsc::List::from(vec![
+    ///     shsc::todata!(1),
+    ///     shsc::todata!(2),
+    ///     shsc::todata!(3),
+    /// ]);
     /// let s = list.tostr();
     /// ```
 
@@ -368,7 +390,11 @@ impl traits::RefCopy for List {
     /// ### Example
     /// ```
     /// use crate::shsc::traits::RefCopy;
-    /// let mut list = shsc::List::from(vec![ shsc::todata!(1), shsc::todata!(2), shsc::todata!(3), ]);
+    /// let mut list = shsc::List::from(vec![
+    ///     shsc::todata!(1),
+    ///     shsc::todata!(2),
+    ///     shsc::todata!(3),
+    /// ]);
     /// let list1 = list.refcopy();
     /// ```
 
@@ -389,10 +415,16 @@ impl traits::RefCopy for List {
     /// Can cause undefined behavior if used without shsc::traits::RefCopy::refcopy.
     /// ### Example
     /// ```
-    /// use crate::shsc::traits::RefCopy;
-    /// let mut list = shsc::List::from(vec![ shsc::todata!(1), shsc::todata!(2), shsc::todata!(3), ]);
-    /// let list1 = list.refcopy(); // new reference copy
-    /// list.refdrop();             // drop original reference copy
+    /// use shsc::traits::RefCopy;
+    /// let mut list = shsc::List::from(vec![
+    ///     shsc::todata!(1),
+    ///     shsc::todata!(2),
+    ///     shsc::todata!(3),
+    /// ]);
+    /// {
+    ///     let list2 = list.refcopy();     // new reference copy
+    /// }                                   // drop reference copy
+    /// list.refdrop();                     // drop original reference copy
     /// ```
 
     fn refdrop(self) {
@@ -408,7 +440,11 @@ impl Clone for List {
     /// A deep copy of the List struct
     /// ### Example
     /// ```
-    /// let list = shsc::List::from(vec![ shsc::todata!(1), shsc::todata!(2), shsc::todata!(3), ]);
+    /// let list = shsc::List::from(vec![
+    ///     shsc::todata!(1),
+    ///     shsc::todata!(2),
+    ///     shsc::todata!(3),
+    /// ]);
     /// let list1 = list.clone();
     /// ```
 
@@ -425,22 +461,24 @@ impl traits::RefC for List {
     /// Implement the RefC trait for the List struct.
     /// This allows us to increment the reference count of the List struct.
     fn incrc(&mut self) {
-        self.refc += 1;
+        unsafe { *self.refc += 1 };
     }
 
     /// Implement the RefC trait for the List struct.
     /// This allows us to decrement the reference count of the List struct.
     fn decrc(&mut self) {
-        self.refc -= 1;
-        if self.refc < 0 {
-            self.refc = 0;
+        unsafe {
+            *self.refc -= 1;
+            if (*self.refc) < 0 {
+                *self.refc = 0;
+            }
         }
     }
 
     /// Implement the RefC trait for the List struct.
     /// This allows us to get the reference count of the List struct.
     fn getrc(&self) -> i64 {
-        self.refc
+        unsafe { *self.refc }
     }
 }
 
@@ -449,24 +487,32 @@ impl Drop for List {
     /// This allows us to deallocate the List struct when the reference count reaches zero.
     /// ### Example
     /// ```
-    /// let list = shsc::List::from(vec![ shsc::todata!(1), shsc::todata!(2), shsc::todata!(3), ]);
+    /// let list = shsc::List::from(vec![
+    ///     shsc::todata!(1),
+    ///     shsc::todata!(2),
+    ///     shsc::todata!(3),
+    /// ]);
     /// ```
 
     fn drop(&mut self) {
-        self.decrc();
-        if self.getrc() > 0 {
-            return;
-        }
-        for i in 0..self.rows {
-            unsafe {
-                let row = self.list.add(i).read();
-                for j in 0..self.cols {
+        unsafe {
+            self.decrc();
+            if self.getrc() > 0 {
+                return;
+            }
+            for i in 0..(*self.rows) {
+                let row = *self.list.add(i);
+                for j in 0..(*self.cols) {
                     // drop data in this scope
                     let _ = row.add(j).read();
                 }
-                alloc::deallocate::<crate::Data>(row, self.cols);
+                alloc::deallocate::<crate::Data>(row, *self.cols);
             }
+            alloc::deallocate::<*mut crate::Data>(self.list, *self.rows);
+            drop(Box::from_raw(self.len));
+            drop(Box::from_raw(self.rows));
+            drop(Box::from_raw(self.cols));
+            drop(Box::from_raw(self.refc));
         }
-        alloc::deallocate::<*mut crate::Data>(self.list, self.rows);
     }
 }
